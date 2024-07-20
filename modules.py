@@ -20,7 +20,7 @@ def comp(name, node1, node2, P2, eff):
 
 
 def heat(name, node11, node12, node21, node22, T12):
-    n = 10
+    n = 20
     fluid1 = nodes.loc[node11]['fluid']
     fluid2 = nodes.loc[node21]['fluid']
     H11 = nodes.loc[node11]['H']
@@ -49,8 +49,6 @@ def heat(name, node11, node12, node21, node22, T12):
         h22 = h21 + (Q[-1-i] - Q[-2-i])/G2
         t2[-2-i] = prop('T', 'H', h22, 'P', P21, fluid2)
         h21 = h22
-    dT = t1 - t2
-    mindT = min(dT)
     T22 = t2[0]
     H22 = h22
     S12 = prop('S', 'H', H12, 'P', P11, fluid1)
@@ -59,10 +57,10 @@ def heat(name, node11, node12, node21, node22, T12):
     Q22 = prop('Q', 'H', H22, 'P', P21, fluid2)
     nodes.loc[node12] = [T12, P11, H12, S12, Q12, G1, fluid1]
     nodes.loc[node22] = [T22, P21, H22, S22, Q22, G2, fluid2]
-    blocks.loc[name, 'Q'] = Q[-1]
-    blocks.loc[name, 'dT'] = mindT
+    blocks.loc[name, 'Q'] = Q
+    blocks.loc[name, 'T1'] = t1
+    blocks.loc[name, 'T2'] = t2
     pass
-
 
 def turb(name, node1, node2, P2, eff):
     fluid = nodes.loc[node1]['fluid']
