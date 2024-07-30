@@ -87,6 +87,32 @@ def cond(name, node1, node2):
     nodes.loc[node2] = [T2, P, H2, S2, 0, G, fluid]
     blocks.loc[name, 'Q'] = G*(H1 - H2)
     pass
+def heater(name, node1, node2,**out):
+    P1 = nodes.loc[node1]['P']
+    H1 = nodes.loc[node1]['H']
+    fluid = nodes.loc[node1]['fluid']
+    G = nodes.loc[node1]['G']
+
+    P2 = P1 - out['dP'] if 'dP' in out else P1
+    if 'Q' in out:
+        Q = out['Q']
+        H2 = H1 + Q/G
+        T2 = prop('T', 'H', H2, 'P', P2, fluid)
+        Q2 = prop('Q', 'H', H2, 'P', P2, fluid)
+        S2 = prop('S', 'H', H2, 'P', P2, fluid)
+    if 'T' in out:
+        T2 = out['T']
+        H2 = prop('H', 'T', T2, 'P', P2, fluid)
+        Q2 = prop('Q', 'T', T2, 'P', P2, fluid)
+        S2 = prop('S', 'T', T2, 'P', P2, fluid)
+    if 'x' in out:
+        Q2 = out['x']
+        H2 = prop('H', 'Q', Q2, 'P', P2, fluid)
+        T2 = prop('T', 'Q', Q2, 'P', P2, fluid)
+        S2 = prop('S', 'Q', Q2, 'P', P2, fluid)
+    nodes.loc[node2] = [T2, P2, H2, S2, Q2, G, fluid]
+    blocks.loc[name, 'Q'] = G * (H2 - H1)
+    pass
 def comb_stoic(name, node11, node12,node2,dP):
     H11 = nodes.loc[node11]['H']
     P11 = nodes.loc[node11]['P']
