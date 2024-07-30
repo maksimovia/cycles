@@ -2,7 +2,7 @@ from CoolProp.CoolProp import PropsSI as prop
 from data import nodes, blocks
 import numpy as np
 from scipy.optimize import root_scalar
-
+import re
 def comp(name, node1, node2, P2, eff):
     fluid = nodes.loc[node1]['fluid']
     S1 = nodes.loc[node1]['S']
@@ -87,110 +87,99 @@ def cond(name, node1, node2):
     nodes.loc[node2] = [T2, P, H2, S2, 0, G, fluid]
     blocks.loc[name, 'Q'] = G*(H1 - H2)
     pass
-
-def comb_stoic_CH4_O2N2(name, node11, node12,node2,dP,O2share):
-    Q_comb = 55515100
-    P11 = nodes.loc[node11]['P']
-    T11 = nodes.loc[node11]['T']
-    P12 = nodes.loc[node12]['P']
-    T12 = nodes.loc[node12]['T']
-    P2 = P11 + dP
-    Ga =  nodes.loc[node11]['G']
-    Bt = nodes.loc[node12]['G']
-
-    N2share = 1-O2share
-    Air = nodes.loc[node11]['fluid']
-
-    M_CH4 = prop('M', 'CH4') * 1000
-    M_O2 = prop('M', 'O2') * 1000
-    M_CO2 = prop('M', 'CO2') * 1000
-    M_H2O = prop('M', 'H2O') * 1000
-    M_N2 = prop('M', 'N2') * 1000
-
-    L_O2 = M_O2 / M_CH4 * 2
-    L_CO2 = M_CO2 / M_CH4 * 1
-    L_H2O = M_H2O / M_CH4 * 2
-    L_N2 = M_N2 / M_CH4 * N2share/O2share*2
-    L_air = L_N2 + L_O2
-
-    def Comb(T2):
-        C_CH4 = prop('Cpmass', 'T', T12, 'P', P12, 'CH4')
-        C_CO2 = prop('Cpmass', 'T', T2, 'P', P2, 'CO2')
-        C_N2 = prop('Cpmass', 'T', T2, 'P', P2, 'N2')
-        C_H2O = prop('Cpmass', 'T', T2, 'P', P2, 'H2O')
-        C_airin = prop('Cpmass', 'T', T11, 'P', P11, Air)
-        C_airout = prop('Cpmass', 'T', T2, 'P', P2, Air)
-
-        global L_pg,alpha
-        alpha = (T2 * (L_CO2 * C_CO2 + L_H2O * C_H2O + L_N2 * C_N2 - L_air * C_airout) - Q_comb - C_CH4 * T12) / (
-                T11 * L_air * C_airin - T2 * L_air * C_airout)
-        L_pg = (L_CO2 + L_N2 + L_H2O + L_air * (alpha - 1))
-        L_pg1 = (Ga+Bt)/Bt
-        return L_pg-L_pg1
-    T2 = root_scalar(Comb, x0=1473, xtol=10**-3).root
-    m_N2 = L_N2 / L_pg[0] + L_air * (alpha[0] - 1) * 0.767 / L_pg[0]
-    m_CO2 = L_CO2 / L_pg[0]
-    m_H2O = L_H2O / L_pg[0]
-    m_O2 = 1 - (m_N2 + m_CO2 + m_H2O)
-
-    mole_mix = m_N2 / M_N2 + m_CO2 / M_CO2 + m_H2O / M_H2O + m_O2 / M_O2
-    w_N2 = m_N2 / M_N2 / mole_mix
-    w_CO2 = m_CO2 / M_CO2 / mole_mix
-    w_H2O = m_H2O / M_H2O / mole_mix
-    w_O2 = m_O2 / M_O2 / mole_mix
-    fluid="REFPROP::N2[" + str(w_N2) + "]&CO2[" + str(w_CO2) + "]&H2O[" + str(w_H2O) + "]&O2[" + str(w_O2) + "]"
-
-    H2 = prop('H', 'T', T2, 'P', P2, fluid)
-    S2 = prop('S', 'T', T2, 'P', P2, fluid)
-    Q2 = prop('Q', 'T', T2, 'P', P2, fluid)
-    G2 = Ga+Bt
-    nodes.loc[node2] = [T2, P2, H2, S2, Q2, G2, fluid]
-    blocks.loc[name, 'alpha'] = alpha[0]
-    pass
-
-def comb_stoic_CH4_O2N22(name, node11, node12,node2,dP):
-    Q_comb = 55515100
+def comb_stoic(name, node11, node12,node2,dP):
     H11 = nodes.loc[node11]['H']
     P11 = nodes.loc[node11]['P']
+    F11 = nodes.loc[node11]['fluid']
+    F12 = nodes.loc[node12]['fluid']
     H12 = nodes.loc[node12]['H']
+    Gox = nodes.loc[node11]['G']
+    Gf = nodes.loc[node12]['G']
     P2 = P11 + dP
-    Ga =  nodes.loc[node11]['G']
-    Bt = nodes.loc[node12]['G']
 
-    H2 = (Ga*H11+Bt*(H12+Q_comb))/(Ga+Bt)
+    Q_CH4 = 55515100
+    Q_H2 = 141783257
+    Q_CO = 10103390
 
     M_CH4 = prop('M', 'CH4') * 1000
+    M_H2 = prop('M', 'H2') * 1000
+    M_CO = prop('M', 'CO') * 1000
     M_O2 = prop('M', 'O2') * 1000
     M_CO2 = prop('M', 'CO2') * 1000
     M_H2O = prop('M', 'H2O') * 1000
     M_N2 = prop('M', 'N2') * 1000
+    M_Ar = prop('M', 'Ar') * 1000
+    M11 = prop('M', F11) * 1000
 
-    m_N2_air = 0.79*M_N2/(0.79*M_N2+0.21*M_O2)
-    m_O2_air = 0.21 * M_O2 / (0.79 * M_N2 + 0.21 * M_O2)
-    G_N2 = Ga*m_N2_air
-    G_O2need = Bt*(2*M_O2/M_CH4)
-    G_O2in = Ga*m_O2_air
-    G_O2out = G_O2in - G_O2need
-    G_CO2 = Bt*M_CO2/M_CH4
-    G_H2O = Bt*2*M_H2O/M_CH4
+    f11num = re.sub('<[^>]+>', ' ', '<'+ F11.replace(']','<').replace('[','>')+'a>').split(' ')[1:-1]
+    f11name = re.sub("\[[^]]*\]", '', F11.replace('REFPROP::','')).split('&')
+    M12 = prop('M', F12) * 1000
+    f12num = re.sub('<[^>]+>', ' ', '<' + F12.replace(']', '<').replace('[', '>') + 'a>').split(' ')[1:-1]
+    f12name = re.sub("\[[^]]*\]", '', F12.replace('REFPROP::', '')).split('&')
+    Mmol12 = np.zeros(len(f12name))
+    m12 = np.zeros(len(f12name))
+    G_O2need = np.zeros(len(f12name))
+    G_CO2frFuel = np.zeros(len(f12name))
+    G_H2OfrFuel = np.zeros(len(f12name))
+    for i in range(0,len(f12name)):
+        Mmol12[i] = prop('M', f12name[i]) * 1000
+        m12[i] = float(Mmol12[i])*float(f12num[i])/M12
+    #methane - h2 - co
+    if 'Methane' in f12name:
+        G_CH4 = Gf*m12[0]
+        G_O2need[0] = G_CH4 * (2 * M_O2 / M_CH4)
+        G_CO2frFuel[0] = G_CH4 * (M_CO2 / M_CH4)
+        G_H2OfrFuel[0] = G_CH4 * (2 * M_H2O / M_CH4)
+    if 'H2' in f12name:
+        G_H2 = Gf*m12[1]
+        G_O2need[1] = G_H2 * (0.5 * M_O2 / M_H2)
+        G_H2OfrFuel[1] = G_H2 * (M_H2O / M_H2)
+    if 'CO' in f12name:
+        G_CO = Gf*m12[2]
+        G_O2need[2] = G_CO * (0.5 * M_O2 / M_CO)
+        G_CO2frFuel[2] = G_CO * (M_CO2 / M_CO)
+    #O2 - 1st
+    Mmol11 = np.zeros(len(f11name))
+    m11 = np.zeros(len(f11name))
+    for i in range(0,len(f11name)):
+        Mmol11[i] = prop('M', f11name[i]) * 1000
+        m11[i] = float(Mmol11[i])*float(f11num[i])/M11
 
-    m_N2 = G_N2 / (Ga+Bt)
-    m_O2 = G_O2out / (Ga + Bt)
-    m_CO2 = G_CO2 / (Ga + Bt)
-    m_H2O = G_H2O / (Ga + Bt)
 
-    mole_mix = m_N2 / M_N2 + m_CO2 / M_CO2 + m_H2O / M_H2O + m_O2 / M_O2
+    G_O2in = m11[f11name.index('O2')]*Gox
+    G_O2 = G_O2in - sum(G_O2need)
+    G_CO2 = m11[f11name.index('CO2')]*Gox + sum(G_CO2frFuel) if 'CO2' in f11name else sum(G_CO2frFuel)
+    G_H2O = m11[f11name.index('H2O')]*Gox + sum(G_H2OfrFuel) if 'H2O' in f11name else sum(G_H2OfrFuel)
+    G_N2 = m11[f11name.index('N2')]*Gox if 'N2' in f11name else 0
+    G_Ar = m11[f11name.index('Ar')]*Gox if 'Ar' in f11name else 0
+
+    m_N2 = G_N2 / (Gox + Gf)
+    m_O2 = G_O2 / (Gox + Gf)
+    m_CO2 = G_CO2 / (Gox + Gf)
+    m_H2O = G_H2O / (Gox + Gf)
+    m_Ar = G_Ar / (Gox + Gf)
+
+    mole_mix = m_N2 / M_N2 + m_CO2 / M_CO2 + m_H2O / M_H2O + m_O2 / M_O2 + m_Ar / M_Ar
     w_N2 = m_N2 / M_N2 / mole_mix
     w_CO2 = m_CO2 / M_CO2 / mole_mix
     w_H2O = m_H2O / M_H2O / mole_mix
     w_O2 = m_O2 / M_O2 / mole_mix
+    w_Ar = m_Ar / M_Ar / mole_mix
+    fluid = "REFPROP::N2[" + str(float(w_N2)) + "]&CO2[" + str(float(w_CO2)) + "]&H2O[" + str(
+        float(w_H2O)) + "]&O2[" + str(float(w_O2)) + "]&Ar[" + str(float(w_Ar))+ "]"
+    qCH4 = m12[f12name.index('Methane')]* Q_CH4 if 'Methane' in f12name else 0
+    qH2 = m12[f12name.index('H2')] * Q_H2 if 'H2' in f12name else 0
+    qCO = m12[f12name.index('CO')] * Q_CO if 'CO' in f12name else 0
 
-    fluid="REFPROP::N2[" + str(float(w_N2)) + "]&CO2[" + str(float(w_CO2)) + "]&H2O[" + str(float(w_H2O)) + "]&O2[" + str(float(w_O2)) + "]"
-
+    H2 = (Gox * H11 + Gf * (H12 + qCH4 + qH2 + qCO)) / (Gox + Gf)
     T2 = prop('T', 'H', H2, 'P', P2, fluid)
     S2 = prop('S', 'H', H2, 'P', P2, fluid)
     Q2 = prop('Q', 'H', H2, 'P', P2, fluid)
-    G2 = Ga+Bt
-    nodes.loc[node2] = [T2, P2,H2, S2, Q2, G2, fluid]
+    G2 = Gox + Gf
+    nodes.loc[node2] = [T2, P2, H2, S2, Q2, G2, fluid]
+    blocks.loc[name, 'Q'] = Gf * (qCH4 + qH2 + qCO)
     pass
+
+
+
 
