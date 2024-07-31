@@ -62,6 +62,121 @@ def heat(name, node11, node12, node21, node22, T12):
     blocks.loc[name, 'T2'] = t2
     pass
 
+def heat(name, node11, node12, node21, node22, T12):
+    n = 20
+    fluid1 = nodes.loc[node11]['fluid']
+    fluid2 = nodes.loc[node21]['fluid']
+    H11 = nodes.loc[node11]['H']
+    T11 = nodes.loc[node11]['T']
+    P11 = nodes.loc[node11]['P']
+    P21 = nodes.loc[node21]['P']
+    T21 = nodes.loc[node21]['T']
+    G1 = nodes.loc[node11]['G']
+    H12 = prop("H", "T", T12, "P", P11, fluid1)
+    G2 = nodes.loc[node21]['G']
+    H21 = nodes.loc[node21]['H']
+    step = (H11 - H12) / (n-1)
+    t1 = np.zeros(n)
+    t2 = np.zeros(n)
+    Q = np.zeros(n)
+    h11 = H11
+    h21 = H21
+    t1[0] = T11
+    t2[-1] = T21
+    for i in range(n-1):
+        h12 = h11 - step
+        t1[i+1] = prop('T', 'H', h12, 'P', P11, fluid1)
+        Q[i+1] = Q[i] + G1*(h11-h12)
+        h11 = h12
+    for i in range(n-1):
+        h22 = h21 + (Q[-1-i] - Q[-2-i])/G2
+        t2[-2-i] = prop('T', 'H', h22, 'P', P21, fluid2)
+        h21 = h22
+    T22 = t2[0]
+    H22 = h22
+    S12 = prop('S', 'H', H12, 'P', P11, fluid1)
+    Q12 = prop('Q', 'H', H12, 'P', P11, fluid1)
+    S22 = prop('S', 'H', H22, 'P', P21, fluid2)
+    Q22 = prop('Q', 'H', H22, 'P', P21, fluid2)
+    nodes.loc[node12] = [T12, P11, H12, S12, Q12, G1, fluid1]
+    nodes.loc[node22] = [T22, P21, H22, S22, Q22, G2, fluid2]
+    blocks.loc[name, 'Q'] = Q
+    blocks.loc[name, 'T1'] = t1
+    blocks.loc[name, 'T2'] = t2
+    pass
+def heat_exch_2streams(name, node11, node12, node21, node22, **out):
+    fluid1 = nodes.loc[node11]['fluid']
+    fluid2 = nodes.loc[node21]['fluid']
+    G1 = nodes.loc[node11]['G']
+    G2 = nodes.loc[node21]['G']
+    H11 = nodes.loc[node11]['H']
+    H21 = nodes.loc[node21]['H']
+    P11 = nodes.loc[node11]['P']
+    P21 = nodes.loc[node21]['P']
+    P12 = P11 - out['dP1'] if 'dP1' in out else P11
+    P22 = P21 - out['dP2'] if 'dP2' in out else P21
+    if 'T22' in out:
+        T22 = out['T22']
+        H22 = prop("H", "T", T22, "P", P22, fluid2)
+        S22 = prop('S', 'T', T22, 'P', P22, fluid2)
+        Q22 = prop('Q', 'T', T22, 'P', P22, fluid2)
+        Q = G2 * (H22 - H21)
+        H12 = H11 - Q/G1
+        T12 = prop('T', 'H', H12, 'P', P12, fluid1)
+        S12 = prop('S', 'H', H12, 'P', P12, fluid1)
+        Q12 = prop('Q', 'H', H12, 'P', P12, fluid1)
+    if 'T12' in out:
+        T12 = out['T12']
+        H12 = prop('H', 'T', T12, 'P', P12, fluid1)
+        S12 = prop('S', 'T', T12, 'P', P12, fluid1)
+        Q12 = prop('Q', 'T', T12, 'P', P12, fluid1)
+        Q = G1 * (H11 - H12)
+        H22 = H21 + Q/G2
+        T22 = prop('T', 'H', H22, 'P', P22, fluid2)
+        S22 = prop('S', 'H', H22, 'P', P22, fluid2)
+        Q22 = prop('Q', 'H', H22, 'P', P22, fluid2)
+    if 'Q22' in out:
+        Q22 = out['Q22']
+        H22 = prop("H", "Q", Q22, "P", P22, fluid2)
+        S22 = prop('S', 'Q', Q22, 'P', P22, fluid2)
+        T22 = prop('T', 'Q', Q22, 'P', P22, fluid2)
+        Q = G2 * (H22 - H21)
+        H12 = H11 - Q/G1
+        T12 = prop('T', 'H', H12, 'P', P12, fluid1)
+        S12 = prop('S', 'H', H12, 'P', P12, fluid1)
+        Q12 = prop('Q', 'H', H12, 'P', P12, fluid1)
+    if 'Q12' in out:
+        Q12 = out['Q12']
+        H12 = prop('H', 'Q', Q12, 'P', P12, fluid1)
+        S12 = prop('S', 'Q', Q12, 'P', P12, fluid1)
+        T12 = prop('T', 'Q', Q12, 'P', P12, fluid1)
+        Q = G1 * (H11 - H12)
+        H22 = H21 + Q/G2
+        T22 = prop('T', 'H', H22, 'P', P22, fluid2)
+        S22 = prop('S', 'H', H22, 'P', P22, fluid2)
+        Q22 = prop('Q', 'H', H22, 'P', P22, fluid2)
+    nodes.loc[node12] = [T12, P12, H12, S12, Q12, G1, fluid1]
+    nodes.loc[node22] = [T22, P22, H22, S22, Q22, G2, fluid2]
+    blocks.loc[name]['Q'] = Q
+    pass
+
+def mix(name, node11, node12,node2):
+    H11 = nodes.loc[node11]['H']
+    H12 = nodes.loc[node12]['H']
+    G11 = nodes.loc[node11]['G']
+    G12 = nodes.loc[node12]['G']
+    P11 = nodes.loc[node11]['P']
+    P12 = nodes.loc[node12]['P']
+    X11 = nodes.loc[node11]['fluid']
+    X12 = nodes.loc[node12]['fluid']
+    if P11 != P12: print("Давления входящих потоков не равны!")
+    if X11 != X12: print("Среды входящих потоков отличаются!")
+    H2 = (G11*H11 + G12*H12)/(G11+G12)
+    T2 = prop('T', 'H', H2, 'P', P12, X11)
+    S2 = prop('S', 'H', H2, 'P', P12, X11)
+    Q2 = prop('Q', 'H', H2, 'P', P12, X11)
+    nodes.loc[node2] = [T2, P12, H2, S2, Q2, G11+G12, X11]
+    pass
 def turb(name, node1, node2, P2, eff):
     fluid = nodes.loc[node1]['fluid']
     S1 = nodes.loc[node1]['S']
@@ -87,7 +202,8 @@ def cond(name, node1, node2):
     nodes.loc[node2] = [T2, P, H2, S2, 0, G, fluid]
     blocks.loc[name, 'Q'] = G*(H1 - H2)
     pass
-def heater(name, node1, node2,**out):
+
+def heat_exch(name, node1, node2,**out):
     P1 = nodes.loc[node1]['P']
     H1 = nodes.loc[node1]['H']
     fluid = nodes.loc[node1]['fluid']

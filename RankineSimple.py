@@ -1,7 +1,7 @@
 import numpy as np
 from CoolProp.CoolProp import PropsSI as prop
 from data import nodes, blocks
-from modules import comp, turb, cond,heater
+from modules import comp, turb,heat_exch
 from scipy.optimize import root_scalar
 def Optimize(P,T):
     KPDturb = 0.9
@@ -18,10 +18,10 @@ def Optimize(P,T):
     Q1 = prop("Q", "P", P1, "T", T1, X1)
     nodes.loc['1'] = [T1, P1, H1, S1, Q1, G1, X1]
     turb('TURB', '1', '2', P2, eff=KPDturb)
-    heater('COND', '2', '3',x=0)
+    heat_exch('COND', '2', '3',x=0)
     comp('PUMP','3','4',P1+dP,eff=KPDpump)
     def Qroot(Qin):
-        heater('BOILER','4','5',dP=dP,Q=Qin)
+        heat_exch('BOILER','4','5',dP=dP,Q=Qin)
         dh=nodes.loc['1']['H']-nodes.loc['5']['H']
         return dh
     root_scalar(Qroot,x0=100000, xtol=10**-5)
