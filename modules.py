@@ -183,6 +183,7 @@ def turb(name, node1, node2, P2, eff):
     H1 = nodes.loc[node1]['H']
     G = nodes.loc[node1]['G']
     H2t = prop("H", "P", P2, "S", S1, fluid)
+    #print(H2t)
     H2 = H1 - (H1 - H2t)*eff
     T2 = prop('T', 'H', H2, 'P', P2, fluid)
     S2 = prop('S', 'H', H2, 'P', P2, fluid)
@@ -242,6 +243,10 @@ def comb_stoic(name, node11, node12,node2,dP):
     Q_CH4 = 55515100
     Q_H2 = 141783257
     Q_CO = 10103390
+
+    Q_CH4L = 50030044
+    Q_H2L = 119957537
+    Q_COL = 10103390
 
     M_CH4 = prop('M', 'CH4') * 1000
     M_H2 = prop('M', 'H2') * 1000
@@ -313,13 +318,17 @@ def comb_stoic(name, node11, node12,node2,dP):
     qH2 = m12[f12name.index('H2')] * Q_H2 if 'H2' in f12name else 0
     qCO = m12[f12name.index('CO')] * Q_CO if 'CO' in f12name else 0
 
+    qCH4L = m12[f12name.index('Methane')] * Q_CH4L if 'Methane' in f12name else 0
+    qH2L = m12[f12name.index('H2')] * Q_H2L if 'H2' in f12name else 0
+    qCOL = m12[f12name.index('CO')] * Q_COL if 'CO' in f12name else 0
+
     H2 = (Gox * H11 + Gf * (H12 + qCH4 + qH2 + qCO)) / (Gox + Gf)
     T2 = prop('T', 'H', H2, 'P', P2, fluid)
     S2 = prop('S', 'H', H2, 'P', P2, fluid)
     Q2 = prop('Q', 'H', H2, 'P', P2, fluid)
     G2 = Gox + Gf
     nodes.loc[node2] = [T2, P2, H2, S2, Q2, G2, fluid]
-    blocks.loc[name, 'Q'] = Gf * (qCH4 + qH2 + qCO)
+    blocks.loc[name, 'Q'] = Gf * (qCH4L + qH2L + qCOL)
     pass
 
 

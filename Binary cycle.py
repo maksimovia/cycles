@@ -50,12 +50,12 @@ Pd = 0.12e6
 dP_deair = 0.3
 dT_deair = 5
 dT_econ = 10
-dP_econ = 0.25e6
+dP_econ = 0#0.25e6
 T15 = 60 + 273.15
 T10 = 515 + 273.15
 dT_pinch = 15
-dP_PE2 = 0.25e6
-dP_GPK = 0.025
+dP_PE2 = 0#0.25e6
+dP_GPK = 0#0.025
 
 X22 = 'Water'
 P22 = P10 + dP_PE2
@@ -71,7 +71,7 @@ H23 = prop('H','Q',Q23,'P',P23,X22)
 S23 = prop('S','Q',Q23,'P',P23,X22)
 nodes.loc['23'] = [T23, P23, H23, S23, Q23, 0, X22]
 def Groot(G):
-    nodes.loc['22']['G'] = G
+    nodes.loc['22','G'] = G
     nodes.loc['24'] = nodes.loc['23']
     heat_exch_2streams('PP','6', '7', '24', '10',dP1 = P25*dP_KU/4,dP2 = dP_PE2, T22 = T10)
     heat_exch_2streams('EVAP','7', '8', '22', '23',dP1 = P25*dP_KU/4, Q22 = 1)
@@ -102,7 +102,7 @@ S17 = prop('S','T',T17,'P',P17,X17)
 nodes.loc['17'] = [T17, P17, H17, S17, Q17, 1, X17]
 #11
 turb('CVD','10','11',Pd*(1+dP_deair),KPDturb)
-nodes.loc['11']['G'] = nodes.loc['10']['G']
+nodes.loc['11','G'] = nodes.loc['10']['G']
 #11.5
 X115 = nodes.loc['11']['fluid']
 H115 = nodes.loc['11']['H']
