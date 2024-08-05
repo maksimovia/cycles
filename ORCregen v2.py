@@ -5,7 +5,7 @@ from modules import comp, heat, turb, cond,heat_exch_2streams,heat_exch
 from scipy.optimize import root_scalar,root
 
 # Исходные данные блоков
-P4 = 6e6
+P4_ = 6e6
 KPDpump = 0.8
 KPDturb = 0.9
 dTh = 10
@@ -54,5 +54,27 @@ def Root1(inp):
     eq2 = T8_ - nodes.loc['8']['T']
     eq3 = T7_ - nodes.loc['7']['T']
     return eq1,eq2,eq3
+def Roo(inp):
+    Gorc_ = inp[0]
+    T6_ = inp[1]
+    T4_ = inp[2]
+    X6 = 'R236ea'  # 6
+    P6 = P4_
+    G6 = Gorc_
+    T6 = T6_
+    H6 = prop("H", "P", P6, "T", T6, X6)
+    S6 = prop("S", "P", P6, "T", T6, X6)
+    Q6 = prop("Q", "P", P6, "T", T6, X6)
+    nodes.loc['6'] = [T6, P6, H6, S6, Q6, G6, X6]
+    turb('TURB','6','7',Pk,KPDturb)
+    X4 = 'R236ea'  # 4
+    P4 = P4_
+    G4 = Gorc_
+    T4 = T4_
+    H4 = prop("H", "P", P4, "T", T4, X4)
+    S4 = prop("S", "P", P4, "T", T4, X4)
+    Q4 = prop("Q", "P", P4, "T", T4, X4)
 
-root(Root1,x0 =([300,450,350]),method='hybr')
+
+
+root(Root1,x0 =[300,450,350],method='hybr')

@@ -4,11 +4,10 @@ from data import nodes, blocks
 from modules import comp, turb,heat_exch
 from scipy.optimize import root_scalar
 def Optimize(P,T):
-    KPDturb = 0.9
+    KPDturb = 0.85
     KPDpump = 0.8
     P2 = 5e3
-    dP = 1e6
-
+    dP = 0#1e6
     X1 = 'Water'
     T1 = T+273.15
     P1 = P
@@ -27,10 +26,16 @@ def Optimize(P,T):
     root_scalar(Qroot,x0=100000, xtol=10**-5)
     Nturb = blocks.loc['TURB','N']
     Npump = blocks.loc['PUMP','N']
+    Ncond = blocks.loc['COND','Q']
     Q = blocks.loc['BOILER','Q']
     KPD = (Nturb-Npump)/Q*100
     print(P,T,KPD,nodes.loc['2']['Q'])
+    print(Q+Npump-Nturb+Ncond)
+    print(nodes)
+    print(blocks)
 
-for P in np.linspace(5e6,22.5e6,50):
-    for T in np.linspace(300,700,10):
-        Optimize(P, T)
+# for P in np.linspace(5e6,22.5e6,50):
+#     for T in np.linspace(300,700,10):
+#         Optimize(P, T)
+
+Optimize(14e6, 560)

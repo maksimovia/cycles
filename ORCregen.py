@@ -106,8 +106,6 @@ plt.plot(X,Y)
 X = [S for S in np.linspace(nodes.loc["8","S"],nodes.loc["3","S"],50)]
 Y = [prop("T","S",S,"P",nodes.loc["8","P"],nodes.loc["3","fluid"]) for S in np.linspace(nodes.loc["8","S"],nodes.loc["3","S"],50)]
 plt.plot(X,Y)
-
-
 plt.show()
 
 

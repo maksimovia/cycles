@@ -228,7 +228,7 @@ def heat_exch(name, node1, node2,**out):
         T2 = prop('T', 'Q', Q2, 'P', P2, fluid)
         S2 = prop('S', 'Q', Q2, 'P', P2, fluid)
     nodes.loc[node2] = [T2, P2, H2, S2, Q2, G, fluid]
-    blocks.loc[name, 'Q'] = G * (H2 - H1)
+    blocks.loc[name, 'Q'] = abs(G * (H2 - H1))
     pass
 def comb_stoic(name, node11, node12,node2,dP):
     H11 = nodes.loc[node11]['H']
