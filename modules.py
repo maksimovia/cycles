@@ -157,6 +157,15 @@ def heat_exch_2streams(name, node11, node12, node21, node22, **out):
         Q22 = prop('Q', 'H', H22, 'P', P22, fluid2)
     nodes.loc[node12] = [T12, P12, H12, S12, Q12, G1, fluid1]
     nodes.loc[node22] = [T22, P22, H22, S22, Q22, G2, fluid2]
+    step = 20
+
+    T1 = [prop('T','P',P11-(P11-P12)/step*i,'H',H11-Q/step*i/G1,fluid1) for i in range(step+1)]
+    T2 = [prop('T','P',P21-(P21-P22)/step*i,'H',H22-Q/step*i/G2,fluid2) for i in range(step+1)]
+    dT = [T1[i] - T2[i] for i in range(step+1)]
+    mitta = min(dT)
+    blocks.loc[name]['dT'] = mitta
+    blocks.loc[name]['T1'] = T1
+    blocks.loc[name]['T2'] = T2
     blocks.loc[name]['Q'] = Q
     pass
 
@@ -169,8 +178,8 @@ def mix(name, node11, node12,node2):
     P12 = nodes.loc[node12]['P']
     X11 = nodes.loc[node11]['fluid']
     X12 = nodes.loc[node12]['fluid']
-    if P11 != P12: print("Давления входящих потоков не равны!")
-    if X11 != X12: print("Среды входящих потоков отличаются!")
+    if P11 != P12: print("Давления входящих потоков в ",name," не равны!")
+    if X11 != X12: print("Среды входящих потоков в ",name," отличаются!")
     H2 = (G11*H11 + G12*H12)/(G11+G12)
     T2 = prop('T', 'H', H2, 'P', P12, X11)
     S2 = prop('S', 'H', H2, 'P', P12, X11)
