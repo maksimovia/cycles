@@ -163,10 +163,10 @@ def heat_exch_2streams(name, node11, node12, node21, node22, **out):
     T2 = [prop('T','P',P21-(P21-P22)/step*i,'H',H22-Q/step*i/G2,fluid2) for i in range(step+1)]
     dT = [T1[i] - T2[i] for i in range(step+1)]
     mitta = min(dT)
-    blocks.loc[name]['dT'] = mitta
-    blocks.loc[name]['T1'] = T1
-    blocks.loc[name]['T2'] = T2
-    blocks.loc[name]['Q'] = Q
+    blocks.loc[name,'dT'] = mitta
+    blocks.loc[name,'T1'] = T1
+    blocks.loc[name,'T2'] = T2
+    blocks.loc[name,'Q'] = Q
     pass
 
 def mix(name, node11, node12,node2):
@@ -186,6 +186,14 @@ def mix(name, node11, node12,node2):
     Q2 = prop('Q', 'H', H2, 'P', P12, X11)
     nodes.loc[node2] = [T2, P12, H2, S2, Q2, G11+G12, X11]
     pass
+def split(name, node1, node21,node22,massfrac):
+    G1 = nodes.loc[node1]['G']
+    nodes.loc[node21] = nodes.loc[node1]
+    nodes.loc[node22] = nodes.loc[node1]
+    nodes.loc[node21, 'G'] = G1*massfrac
+    nodes.loc[node22, 'G'] = G1*(1-massfrac)
+    pass
+
 def turb(name, node1, node2, P2, eff):
     fluid = nodes.loc[node1]['fluid']
     S1 = nodes.loc[node1]['S']

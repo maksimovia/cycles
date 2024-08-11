@@ -5,39 +5,40 @@ from modules import comp, turb, heat_exch_2streams,comb_stoic,mix,heat_exch
 from scipy.optimize import root_scalar
 from scipy.optimize import root
 def Optimize(PS):
-    P3g = 3e6
-    dP_KU = 0#0.025
-    P10g = 0.1013e6
-    P6g = P10g*(1+dP_KU)
-    T6g = 1060+273.15
-    KPDcomp = 0.85
+    P2g = 2.5e6
+    P6g = 1e5
+    T5g = 1200 + 273.15
+    KPDcomp = 0.8
     KPDturb = 0.9
 
-    X1g = 'REFPROP::O2[0.21]&N2[0.79]'
-    T1g = 15+273.15
+    X1g = 'REFPROP::O2[0.2]&N2[0.77]&CO2[0.01]&Ar[0.01]&H2O[0.01]'
+    T1g = 15 + 273.15
     P1g = 1e5
-    G1g = 490
+    G1g = 120
     H1g = prop("H", "P", P1g, "T", T1g, X1g)
     S1g = prop("S", "P", P1g, "T", T1g, X1g)
     Q1g = prop("Q", "P", P1g, "T", T1g, X1g)
     nodes.loc['1g'] = [T1g, P1g, H1g, S1g, Q1g, G1g, X1g]
-    X2g = 'REFPROP::Methane[1]'
-    T2g = 50+273.15
-    P2g = 1.2e6
-    H2g = prop("H", "P", P2g, "T", T2g, X2g)
-    S2g = prop("S", "P", P2g, "T", T2g, X2g)
-    Q2g = prop("Q", "P", P2g, "T", T2g, X2g)
-    nodes.loc['2g'] = [T2g, P2g, H2g, S2g, Q2g, '', X2g]
-    def Troot(G2g):
-        nodes.loc['2g','G'] = float(G2g)
-        comp('AirCOMP', '1g', '3g', P3g, KPDcomp)
-        comp('FuelCOMP', '2g', '4g', P3g, KPDcomp)
-        comb_stoic('COMB', '3g', '4g','5g',dP=0)
-        return nodes.loc['5g']['T'] - T6g
-    root_scalar(Troot,x0=1, xtol=10**-5)
+    X3g = 'REFPROP::Methane[1]&H2[0]&CO[0]'
+    T3g = 50 + 273.15
+    P3g = 1.2e5
+    G3g = 1
+    H3g = prop("H", "P", P3g, "T", T3g, X3g)
+    S3g = prop("S", "P", P3g, "T", T3g, X3g)
+    Q3g = prop("Q", "P", P3g, "T", T3g, X3g)
+    nodes.loc['3g'] = [T3g, P3g, H3g, S3g, Q3g, G3g, X3g]
+
+    def Calc0(G3):
+        nodes.loc['3g', 'G'] = float(G3)
+        comp('AirCOMP', '1g', '2g', P2g, KPDcomp)
+        comp('FuelCOMP', '3g', '4g', P2g, KPDcomp)
+        comb_stoic('COMB', '2g', '4g', '5g', dP=0)
+        return nodes.loc['5g']['T'] - T5g
+
+    root_scalar(Calc0, bracket=[0.2, 5], xtol=10 ** -9, method='bisect')
     turb('GTURB', '5g', '6g', P6g, KPDturb)
 
-    Pk = 0.004246971e6
+    Pk = 0.005e6
     P1_ = PS  # 4.138998301e6
     Pd = 0.12e6
     dP_deair = 0.05
@@ -45,12 +46,14 @@ def Optimize(PS):
     T8_ = 100 + 273.15
     dT_econ = 10
     dP_econ = 0  # 0.25e6
+    P10g = 1e5
     T7_ = 60 + 273.15
     T1_ = nodes.loc['6g']['T'] - 30#515 + 273.15
     dT_pinch = 10
+    dP_KU = 0
     dP_PE = 0  # 0.25e6
     dP_GPK = 0  # 0.025
-    def Root(input):
+    def Calc(input):
         D0_ = input[0]
         Gotb_ = input[1]
         Grec_ = input[2]
@@ -135,10 +138,10 @@ def Optimize(PS):
         eq2 = nodes.loc['14']['H'] - Hd
         eq3 = T7_ - nodes.loc['7']['T']
         eq4 = T8g_ - nodes.loc['8g']['T']
-        eq5 = T8g_ - nodes.loc['17']['T'] - dT_pinch
-        print(eq1,eq2,eq3,eq4,eq5)
+        eq5 = blocks.loc['EVAP','dT'] - dT_pinch
+        #print(eq1,eq2,eq3,eq4,eq5)
         return eq1,eq2,eq3,eq4,eq5
-    root(Root, x0=([10,0.1,3,500, 400]), method='hybr',tol=10**-15)
+    root(Calc, x0=([3,0.1,3,500, 400]), method='hybr',tol=10**-15)
 
     #print(nodes.iloc[:, 0:6])
     # print(blocks)
@@ -162,8 +165,21 @@ def Optimize(PS):
     KPD_PTU = (N_CVD+N_CND-N_PN-N_CN-N_RN)/(nodes.loc['6g','G']*(nodes.loc['6g','H'] - nodes.loc['10g','H']))
     KPD_PGU1 = (Ngasturb-Naircomp-Nfuelcomp+N_CVD+N_CND-N_PN-N_CN-N_RN)/Qcomb
     KPD_PGU2 = KPD_GTU + (1-KPD_GTU)*KPD_KU*KPD_PTU
-    print(PS,KPD_GTU,KPD_KU,KPD_PTU,KPD_PGU1,KPD_PGU2,nodes.loc['4']['Q'],nodes.loc['6g']['T']-273.15,N_CVD,N_CND,Ngasturb,Naircomp,Nfuelcomp,N_PN,N_CN,N_RN)
+    print(*[blocks.loc['PP', 'Q'] /1e6/ 20 * i for i in range(21)])
+    print(*[x - 273.15 for x in blocks.loc['PP','T1']])
+    print(*[x - 273.15 for x in blocks.loc['PP', 'T2']])
+    print(*[blocks.loc['EVAP', 'Q'] / 1e6 / 20 * i + blocks.loc['PP', 'Q']/1e6  for i in range(21)])
+    print(*[x - 273.15 for x in blocks.loc['EVAP', 'T1']])
+    print(*[x - 273.15 for x in blocks.loc['EVAP', 'T2']])
+    print(*[blocks.loc['ECON', 'Q'] / 1e6 / 20 * i + (blocks.loc['PP', 'Q'] + blocks.loc['EVAP', 'Q'])/1e6  for i in range(21)])
+    print(*[x - 273.15 for x in blocks.loc['ECON', 'T1']])
+    print(*[x - 273.15 for x in blocks.loc['ECON', 'T2']])
+    print(*[blocks.loc['GPK', 'Q'] / 1e6 / 20 * i + (blocks.loc['PP', 'Q'] + blocks.loc['EVAP', 'Q'] + blocks.loc['ECON', 'Q']) / 1e6 for i in
+            range(21)])
+    print(*[x - 273.15 for x in blocks.loc['GPK', 'T1']])
+    print(*[x - 273.15 for x in blocks.loc['GPK', 'T2']])
+    print(PS,KPD_GTU,KPD_KU,KPD_PTU,KPD_PGU1,KPD_PGU2,nodes.loc['4']['Q'],nodes.loc['6g']['T']-273.15,N_CVD,N_CND,Ngasturb,Naircomp,Nfuelcomp,N_PN,N_CN,N_RN,nodes.loc['4','Q'])
 
-Optimize(4.5e6)
-# for PS in np.linspace(3e6,7e6,10):
+Optimize(5.5e6)
+# for PS in np.linspace(1.5e6,3e6,10):
 #     Optimize(PS)
