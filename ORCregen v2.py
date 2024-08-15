@@ -3,8 +3,9 @@ from CoolProp.CoolProp import PropsSI as prop
 from data import nodes, blocks
 from modules import comp, heat, turb, cond,heat_exch_2streams,heat_exch
 from scipy.optimize import root_scalar,root
+import pandas as pd
 
-def Optimize(P6,Pk):
+def Sensitivity(P6,P3):
     # Исходные данные блоков
     #P6 = 6e6
     KPDpump = 0.8
@@ -15,7 +16,6 @@ def Optimize(P6,Pk):
     def Calc(inp):
         Gorc = inp[0]
         T1 = inp[1]
-
         X1 = 'R236ea'
         P1 = P6
         H1 = prop("H", "P", P1, "T", T1, X1)
@@ -23,7 +23,7 @@ def Optimize(P6,Pk):
         Q1 = prop("Q", "P", P1, "T", T1, X1)
         nodes.loc['1'] = [T1, P1, H1, S1, Q1, Gorc, X1]
         heat_exch_2streams('HEAT','7','8','1','2',T12=T8)
-        turb('TURB','2','3',Pk,KPDturb)
+        turb('TURB','2','3',P3,KPDturb)
         T6 = inp[2]
         X6 = 'R236ea'
         H6 = prop("H", "P", P6, "T", T6, X6)
@@ -59,8 +59,8 @@ def Optimize(P6,Pk):
     Qcond = blocks.loc['COND','Q']
     Nturb = blocks.loc['TURB','N']
     Npump = blocks.loc['PUMP','N']
-    KPD1 = (Nturb-Npump)/Qheat
-    print(P6,Pk,KPD1)
+    KPD1 = (Nturb-Npump)/Qheat*100
+    print(P6,P3,KPD1)
     # print(Qheat-Qcond-Nturb+Npump,'Balance')
     # print("KPD1",(Nturb-Npump)/Qheat)
     # print("KPD2",1-(Qcond)/Qheat)
@@ -68,6 +68,30 @@ def Optimize(P6,Pk):
     # print(blocks.loc['REGEN','T2'])
     # print([blocks.loc['REGEN','Q']/20*i for i in range(21)])
 
+    # X = [S/1000 for S in np.linspace(nodes.loc["4", "S"], nodes.loc["5", "S"], 50)]
+    # Y = [prop("T", "S", S, "P", nodes.loc["4", "P"], nodes.loc["4", "fluid"])-273.15 for S in np.linspace(nodes.loc["4", "S"], nodes.loc["5", "S"], 50)]
+    #
+    # P = np.linspace(nodes.loc["2","P"],nodes.loc["3","P"],50)
+    # P1 = P[-2]
+    # P = np.append(P[0:-2],np.linspace(P1,nodes.loc["3","P"],100))
+    # H = nodes.loc["2","H"] - (nodes.loc["2","H"] - prop('H','P',P,'S',nodes.loc["2",'S'],nodes.loc["3", "fluid"]))*KPDturb
+    # X = prop("S","P",P,"H",H,nodes.loc["2","fluid"])/1000
+    # Y = prop("T","P",P,"H",H,nodes.loc["2","fluid"])-273.15
+    #
+    # X = nodes.loc["5":"6", "S"]/1000
+    # Y = nodes.loc["5":"6", "T"]-273.15
+    #
+    # T = np.linspace(273.15,prop('Tcrit',nodes.loc["3", "fluid"]), 50)
+    # T1 = T[-2]
+    # T = np.append(T[0:-2],np.linspace(T1,prop('Tcrit',nodes.loc["3", "fluid"]),100))
+    # Y = T -273.15
+    # X = prop("S", "T", T, "Q", 1, nodes.loc["2", "fluid"])/1000
+    #
+    #
+    #
+    # print(*X)
+    # print(*Y)
+
 for P0 in np.linspace(3e6,8e6,6):
     for Pk in np.linspace(0.1e6,0.6e6,6):
-        Optimize(P0,Pk)
+        Sensitivity(6e6, 0.245e6)
