@@ -3,6 +3,47 @@ from data import nodes, blocks
 import numpy as np
 from scipy.optimize import root_scalar
 import re
+
+def Node(node,G,fluid,**out):
+    if 'P' in out and 'T' in out:
+        nodes.loc[node, 'T'] = out['T']
+        nodes.loc[node, 'P'] = out['P']
+        nodes.loc[node, 'H'] = prop('H', 'T', out['T'], 'P', out['P'], fluid)
+        nodes.loc[node, 'S'] = prop('S', 'T', out['T'], 'P', out['P'], fluid)
+        nodes.loc[node, 'Q'] = prop('Q', 'T', out['T'], 'P', out['P'], fluid)
+    elif 'P' in out and 'H' in out:
+        nodes.loc[node, 'H'] = out['H']
+        nodes.loc[node, 'P'] = out['P']
+        nodes.loc[node, 'T'] = prop('T', 'H', out['H'], 'P', out['P'], fluid)
+        nodes.loc[node, 'S'] = prop('S', 'H', out['H'], 'P', out['P'], fluid)
+        nodes.loc[node, 'Q'] = prop('Q', 'H', out['H'], 'P', out['P'], fluid)
+    elif 'P' in out and 'Q' in out:
+        nodes.loc[node, 'Q'] = out['Q']
+        nodes.loc[node, 'P'] = out['P']
+        nodes.loc[node, 'T'] = prop('T', 'Q', out['Q'], 'P', out['P'], fluid)
+        nodes.loc[node, 'S'] = prop('S', 'Q', out['Q'], 'P', out['P'], fluid)
+        nodes.loc[node, 'H'] = prop('H', 'Q', out['Q'], 'P', out['P'], fluid)
+    elif 'P' in out and 'S' in out:
+        nodes.loc[node, 'S'] = out['S']
+        nodes.loc[node, 'P'] = out['P']
+        nodes.loc[node, 'T'] = prop('T', 'S', out['S'], 'P', out['P'], fluid)
+        nodes.loc[node, 'Q'] = prop('Q', 'S', out['S'], 'P', out['P'], fluid)
+        nodes.loc[node, 'H'] = prop('H', 'S', out['S'], 'P', out['P'], fluid)
+    elif 'T' in out and 'S' in out:
+        nodes.loc[node, 'S'] = out['S']
+        nodes.loc[node, 'T'] = out['T']
+        nodes.loc[node, 'P'] = prop('P', 'S', out['S'], 'T', out['T'], fluid)
+        nodes.loc[node, 'Q'] = prop('Q', 'S', out['S'], 'T', out['T'], fluid)
+        nodes.loc[node, 'H'] = prop('H', 'S', out['S'], 'T', out['T'], fluid)
+    elif 'T' in out and 'Q' in out:
+        nodes.loc[node, 'Q'] = out['Q']
+        nodes.loc[node, 'T'] = out['T']
+        nodes.loc[node, 'P'] = prop('P', 'Q', out['Q'], 'T', out['T'], fluid)
+        nodes.loc[node, 'S'] = prop('Q', 'Q', out['Q'], 'T', out['T'], fluid)
+        nodes.loc[node, 'H'] = prop('H', 'Q', out['Q'], 'T', out['T'], fluid)
+    nodes.loc[node, 'fluid'] = fluid
+    nodes.loc[node, 'G'] = G
+    pass
 def comp(name, node1, node2, P2, eff):
     fluid = nodes.loc[node1]['fluid']
     S1 = nodes.loc[node1]['S']
@@ -104,6 +145,7 @@ def heat(name, node11, node12, node21, node22, T12):
     blocks.loc[name, 'T1'] = t1
     blocks.loc[name, 'T2'] = t2
     pass
+
 def heat_exch_2streams(name, node11, node12, node21, node22, **out):
     fluid1 = nodes.loc[node11]['fluid']
     fluid2 = nodes.loc[node21]['fluid']
@@ -158,12 +200,11 @@ def heat_exch_2streams(name, node11, node12, node21, node22, **out):
     nodes.loc[node12] = [T12, P12, H12, S12, Q12, G1, fluid1]
     nodes.loc[node22] = [T22, P22, H22, S22, Q22, G2, fluid2]
     step = 20
-
     T1 = [prop('T','P',P11-(P11-P12)/step*i,'H',H11-Q/step*i/G1,fluid1) for i in range(step+1)]
     T2 = [prop('T','P',P21-(P21-P22)/step*i,'H',H22-Q/step*i/G2,fluid2) for i in range(step+1)]
     dT = [T1[i] - T2[i] for i in range(step+1)]
-    mitta = min(dT)
-    blocks.loc[name,'dT'] = mitta
+    dTmin = min(dT)
+    blocks.loc[name,'dT'] = dTmin
     blocks.loc[name,'T1'] = T1
     blocks.loc[name,'T2'] = T2
     blocks.loc[name,'Q'] = Q
@@ -247,7 +288,7 @@ def heat_exch(name, node1, node2,**out):
     nodes.loc[node2] = [T2, P2, H2, S2, Q2, G, fluid]
     blocks.loc[name, 'Q'] = abs(G * (H2 - H1))
     pass
-def comb_stoic(name, node11, node12,node2,dP):
+def comb_stoic(name, node11, node12,node2):
     H11 = nodes.loc[node11]['H']
     P11 = nodes.loc[node11]['P']
     F11 = nodes.loc[node11]['fluid']
@@ -255,12 +296,10 @@ def comb_stoic(name, node11, node12,node2,dP):
     H12 = nodes.loc[node12]['H']
     Gox = nodes.loc[node11]['G']
     Gf = nodes.loc[node12]['G']
-    P2 = P11 + dP
-
+    P2 = P11
     Q_CH4 = 55515100
     Q_H2 = 141783257
     Q_CO = 10103390
-
     Q_CH4L = 50030044
     Q_H2L = 119957537
     Q_COL = 10103390
