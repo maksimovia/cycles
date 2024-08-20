@@ -1,7 +1,7 @@
 import numpy as np
 from CoolProp.CoolProp import PropsSI as prop
 from data import nodes, blocks
-from modules import Node, comp, heat, turb, cond,comb_stoic
+from modules import Node, comp, turb,comb_stoic
 from scipy.optimize import root_scalar
 def Sensetivity(P2,T):
     P5 = 1e5
@@ -22,7 +22,6 @@ def Sensetivity(P2,T):
         nodes.loc['3','G'] = float(G3)
         comb_stoic('COMB', '2', '3','4')
         print(nodes.loc['4']['T'] - T4)
-        #print(G3)
         return nodes.loc['4']['T'] - T4
     root_scalar(Calc,bracket=[0.2,3], xtol=10**-5,method='bisect')
     turb('TURB', '4', '5', P5, KPDturb)

@@ -71,7 +71,7 @@ def Sensitivity(P6,P3):
     #
     # print(*X)
     # print(*Y)
-
-for P0 in np.linspace(3e6,8e6,6):
-    for Pk in np.linspace(0.1e6,0.6e6,6):
-        Sensitivity(6e6, 0.245e6)
+Sensitivity(6e6, 0.245e6)
+# for P0 in np.linspace(3e6,8e6,6):
+#     for Pk in np.linspace(0.1e6,0.6e6,6):
+#         Sensitivity(6e6, 0.245e6)

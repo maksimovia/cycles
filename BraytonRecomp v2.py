@@ -69,6 +69,7 @@ def Sensitivity(inp):
     return -KPD1
 
 Sensitivity([23.5e6,0.67])
+print(blocks)
 # minimize(Sensitivity,x0=[22e6,0.6], method='Nelder-Mead',tol=10**-2)
 
 # print(nodes)
