@@ -6,6 +6,8 @@ import re
 import CoolProp
 
 def Node(node,G,fluid,**out):
+    nodes.loc[node, 'fluid'] = fluid
+    nodes.loc[node, 'G'] = G
     if 'P' in out and 'T' in out:
         nodes.loc[node, 'T'] = out['T']
         nodes.loc[node, 'P'] = out['P']
@@ -42,17 +44,17 @@ def Node(node,G,fluid,**out):
         nodes.loc[node, 'P'] = prop('P', 'Q', out['Q'], 'T', out['T'], fluid)
         nodes.loc[node, 'S'] = prop('Q', 'Q', out['Q'], 'T', out['T'], fluid)
         nodes.loc[node, 'H'] = prop('H', 'Q', out['Q'], 'T', out['T'], fluid)
-    nodes.loc[node, 'fluid'] = fluid
-    nodes.loc[node, 'G'] = G
+
     pass
 def comp(name, node1, node2, P2, eff):
     fluid = nodes.loc[node1, 'fluid']
-    G = nodes.loc[node1, 'G']
+    G1= nodes.loc[node1, 'G']
     H2t = prop("H", "P", P2, "S", nodes.loc[node1, 'S'], fluid)
-    Node(node2,G=G,P=P2,H=nodes.loc[node1, 'H']+(H2t-nodes.loc[node1, 'H'])/eff,fluid=fluid)
-    blocks.loc[name, 'N'] = G * (nodes.loc[node2, 'H']-nodes.loc[node1, 'H'])
+    H2 = nodes.loc[node1, 'H']+(H2t-nodes.loc[node1, 'H'])/eff
+    Node(node2,G=G1,P=P2,H=H2,fluid=fluid)
+    blocks.loc[name, 'N'] = G1* (nodes.loc[node2, 'H']-nodes.loc[node1, 'H'])
     pass
-def heat_exch_2streams(name, node11, node12, node21, node22, **out):
+def heat_exch(name, node11, node12, node21, node22, **out):
     fluid1 = nodes.loc[node11]['fluid']
     fluid2 = nodes.loc[node21]['fluid']
     G1 = nodes.loc[node11]['G']
@@ -103,51 +105,50 @@ def split(name, node1, node21,node22,massfrac):
     nodes.loc[node21, 'G'] = G1*massfrac
     nodes.loc[node22, 'G'] = G1*(1-massfrac)
     pass
+def throttle(name, node1, node2,P2):
+    G1 = nodes.loc[node1]['G']
+    fluid = nodes.loc[node1, 'fluid']
+    Node(node2,G=G1,P=P2,H=nodes.loc[node1,'H'],fluid=fluid)
+    pass
 
 def turb(name, node1, node2, P2, eff):
     fluid = nodes.loc[node1, 'fluid']
-    G = nodes.loc[node1, 'G']
+    G1= nodes.loc[node1, 'G']
     H2t = prop("H", "P", P2, "S", nodes.loc[node1, 'S'], fluid)
-    Node(node2, G=G, P=P2, H=nodes.loc[node1, 'H']-(nodes.loc[node1, 'H']-H2t)*eff, fluid=fluid)
-    blocks.loc[name, 'N'] = G * (nodes.loc[node1, 'H'] - nodes.loc[node2, 'H'])
+    H2 = nodes.loc[node1, 'H'] - (nodes.loc[node1, 'H'] - H2t) * eff
+    Node(node2, G=G1, P=P2, H=H2, fluid=fluid)
+    blocks.loc[name, 'N'] = G1* (nodes.loc[node1, 'H'] - nodes.loc[node2, 'H'])
     pass
-def heat_exch(name, node1, node2,**out):
+def heat_source(name, node1, node2, **out):
     P1 = nodes.loc[node1, 'P']
     fluid = nodes.loc[node1, 'fluid']
-    G = nodes.loc[node1, 'G']
+    G1 = nodes.loc[node1, 'G']
     P2 = P1 - out['dP'] if 'dP' in out else P1
-    if 'Q' in out:
-        Node(node2, G=G, P=P2, H=nodes.loc[node1, 'H']+out['Q']/G, fluid=fluid)
-    elif 'T' in out:
-        Node(node2, G=G, P=P2, T=out['T'], fluid=fluid)
-    elif 'x' in out:
-        Node(node2, G=G, P=P2, Q=out['x'], fluid=fluid)
-    blocks.loc[name,'Q'] = abs(G*(nodes.loc[node2, 'H']-nodes.loc[node1, 'H']))
+    if 'Q' in out: Node(node2, G=G1, P=P2, H=nodes.loc[node1, 'H']+out['Q']/G1, fluid=fluid)
+    elif 'T' in out: Node(node2, G=G1, P=P2, T=out['T'], fluid=fluid)
+    elif 'x' in out: Node(node2, G=G1, P=P2, Q=out['x'], fluid=fluid)
+    blocks.loc[name,'Q'] = abs(G1*(nodes.loc[node2, 'H']-nodes.loc[node1, 'H']))
     pass
 def comb_stoic(name, node11, node12,node2):
-    H11 = nodes.loc[node11]['H']
-    P11 = nodes.loc[node11]['P']
-    F11 = nodes.loc[node11]['fluid']
-    F12 = nodes.loc[node12]['fluid']
-    H12 = nodes.loc[node12]['H']
-    Gox = nodes.loc[node11]['G']
-    Gf = nodes.loc[node12]['G']
-    P2 = P11
-    Qname = ['Methane_h', 'H2_h', 'CO_h', 'Methane_l', 'H2_l', 'CO_l']
-    Qnum = [55515100, 141783257, 10103390, 50030044, 119957537, 10103390]
-    Qc = dict(zip(Qname, Qnum))
-    Mname = ['Methane', 'H2', 'CO', 'H2O', 'N2','O2','CO2', 'Ar', F11,F12]
-    M = dict(zip(Mname, [prop('M', x) * 1000 for x in Mname]))
-    f11num = re.sub('<[^>]+>', ' ', '<'+ F11.replace(']','<').replace('[','>')+'a>').split(' ')[1:-1]
-    f11name = re.sub("\[[^]]*\]", '', F11.replace('REFPROP::','')).split('&')
-    f11 = dict(zip(f11name, f11num))
-    f12num = re.sub('<[^>]+>', ' ', '<' + F12.replace(']', '<').replace('[', '>') + 'a>').split(' ')[1:-1]
-    f12name = re.sub("\[[^]]*\]", '', F12.replace('REFPROP::', '')).split('&')
-    f12 = dict(zip(f12name, f12num))
-    m11num = [prop('M', x)*1000*float(f11[x])/M[F11] for x in f11name]
-    m11 = dict(zip(f11name,m11num))
-    m12num = [prop('M', x)*1000*float(f12[x])/M[F12] for x in f12name]
-    m12 = dict(zip(f12name,m12num))
+    F11 = nodes.loc[node11, 'fluid']
+    F12 = nodes.loc[node12, 'fluid']
+    Gox = nodes.loc[node11, 'G']
+    Gf = nodes.loc[node12, 'G']
+    Qkey = ['Methane_h', 'H2_h', 'CO_h', 'Methane_l', 'H2_l', 'CO_l']
+    Qval = [55515100, 141783257, 10103390, 50030044, 119957537, 10103390]
+    Qc = dict(zip(Qkey, Qval))
+    Mkey = ['Methane', 'H2', 'CO', 'H2O', 'N2','O2','CO2', 'Ar', F11,F12]
+    M = dict(zip(Mkey, [prop('M', x) * 1000 for x in Mkey]))
+    f11val = re.sub('<[^>]+>', ' ', '<'+ F11.replace(']','<').replace('[','>')+'a>').split(' ')[1:-1]
+    f11key = re.sub("\[[^]]*\]", '', F11.replace('REFPROP::','')).split('&')
+    f11 = dict(zip(f11key, f11val))
+    f12val = re.sub('<[^>]+>', ' ', '<' + F12.replace(']', '<').replace('[', '>') + 'a>').split(' ')[1:-1]
+    f12key = re.sub("\[[^]]*\]", '', F12.replace('REFPROP::', '')).split('&')
+    f12 = dict(zip(f12key, f12val))
+    m11val = [prop('M', x)*1000*float(f11[x])/M[F11] for x in f11key]
+    m11 = dict(zip(f11key,m11val))
+    m12val = [prop('M', x)*1000*float(f12[x])/M[F12] for x in f12key]
+    m12 = dict(zip(f12key,m12val))
     G_O2need = {}
     G_CO2frFuel = {}
     G_H2OfrFuel = {}
@@ -163,27 +164,43 @@ def comb_stoic(name, node11, node12,node2):
     G_CO2frFuel['CO2'] = G_CO * (M['CO2'] / M['CO'])
     G_O2in = m11['O2'] * Gox
     G_O2 = G_O2in - sum(G_O2need.values())
-    G_CO2 = m11['CO2']*Gox + sum(G_CO2frFuel.values()) if 'CO2' in f11name else sum(G_CO2frFuel.values())
-    G_H2O = m11['H2O']*Gox + sum(G_H2OfrFuel.values()) if 'H2O' in f11name else sum(G_H2OfrFuel.values())
-    G_N2 = m11['N2']*Gox if 'N2' in f11name else 0
-    G_Ar = m11['Ar']*Gox if 'Ar' in f11name else 0
-    m_num = [x/(Gox + Gf) for x in [G_O2, G_CO2, G_H2O, G_N2, G_Ar]]
-    m = dict(zip(['O2','CO2','H2O','N2','Ar'],m_num))
+    G_CO2 = m11['CO2']*Gox + sum(G_CO2frFuel.values()) if 'CO2' in f11key else sum(G_CO2frFuel.values())
+    G_H2O = m11['H2O']*Gox + sum(G_H2OfrFuel.values()) if 'H2O' in f11key else sum(G_H2OfrFuel.values())
+    G_N2 = m11['N2']*Gox if 'N2' in f11key else 0
+    G_Ar = m11['Ar']*Gox if 'Ar' in f11key else 0
+    m_val = [x/(Gox + Gf) for x in [G_O2, G_CO2, G_H2O, G_N2, G_Ar]]
+    m = dict(zip(['O2','CO2','H2O','N2','Ar'],m_val))
     mole_mix = sum([m[x]/M[x] for x in ['O2','CO2','H2O','N2','Ar']])
-    w_num = [m[x]/M[x]/mole_mix for x in ['O2','CO2','H2O','N2','Ar']]
-    w = dict(zip(['O2','CO2','H2O','N2','Ar'],w_num))
+    w_val = [m[x]/M[x]/mole_mix for x in ['O2','CO2','H2O','N2','Ar']]
+    w = dict(zip(['O2','CO2','H2O','N2','Ar'],w_val))
     fluid = "REFPROP::N2[" + str(w['N2']) + "]&CO2[" + str(w['CO2']) + "]&H2O[" + str(
         w['H2O']) + "]&O2[" + str(w['O2']) + "]&Ar[" + str(w['Ar'])+ "]"
-    Qh = [m12[x] * Qc[x+'_h'] for x in f12name]
-    Ql = [m12[x] * Qc[x + '_l'] for x in f12name]
-    H2 = (Gox * H11 + Gf * (H12 + sum(Qh))) / (Gox + Gf)
-    Node(node2,G=Gox + Gf,P=P2,H=H2,fluid=fluid)
+    Qh = [m12[x] * Qc[x+'_h'] for x in f12key]
+    Ql = [m12[x] * Qc[x + '_l'] for x in f12key]
+    H2 = (Gox * nodes.loc[node11, 'H'] + Gf * (nodes.loc[node12, 'H'] + sum(Qh))) / (Gox + Gf)
+    Node(node2,G=Gox + Gf,P=nodes.loc[node11, 'P'],H=H2,fluid=fluid)
     blocks.loc[name, 'Q'] = Gf * (sum(Ql))
     pass
-
-
-
-
+def comb_stoic2(name, node11, node12,node2,w_N2):
+    G11 = nodes.loc[node11, 'G']
+    G12 = nodes.loc[node12, 'G']
+    GM11 = G11/prop('M',nodes.loc[node11, 'fluid'])
+    GM12 = G12/prop('M',nodes.loc[node12, 'fluid'])
+    w_N2 = 0.79
+    GM_N2 = w_N2*GM11
+    GM_O2in = (1-w_N2)*GM11
+    GM_CO2 = GM12*1
+    GM_H2O = GM12*2
+    GM_O2 = GM_O2in-GM12*2
+    GM2 = sum([GM_O2, GM_CO2, GM_H2O, GM_N2])
+    w_val = [x / GM2 for x in [GM_O2, GM_CO2, GM_H2O, GM_N2]]
+    w = dict(zip(['O2', 'CO2', 'H2O', 'N2'], w_val))
+    fluid = "REFPROP::N2["+str(w['N2'])+"]&CO2["+str(w['CO2'])+"]&H2O["+str(
+        w['H2O'])+"]&O2["+str(w['O2'])+"]"
+    H2 = (G11*nodes.loc[node11,'H']+G12*(nodes.loc[node12,'H']+55515100))/(G11+G12)
+    Node(node2,G=G11+G12,P=nodes.loc[node11,'P'],H=H2,fluid=fluid)
+    blocks.loc[name,'Q'] = G12*50030044
+    pass
 # def heat(name, node11, node12, node21, node22, T12):
 #     n = 20
 #     fluid1 = nodes.loc[node11]['fluid']

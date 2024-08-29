@@ -1,7 +1,7 @@
 import numpy as np
 from CoolProp.CoolProp import PropsSI as prop
 from data import nodes, blocks
-from modules import Node, comp, turb,heat_exch,heat_exch_2streams,split,mix
+from modules import Node, comp, turb,heat_source,heat_exch,split,mix
 from scipy.optimize import root_scalar,root,minimize
 
 def Sensitivity(inp):
@@ -19,20 +19,19 @@ def Sensitivity(inp):
     dTl = 10
     def Calc(input):
         T1 = input[0]
-        X1 = 'CO2'
         Node('1',G=G1,P=P1,T=T1,fluid='CO2')
-        heat_exch('HEAT','1','2',T=T2)
+        heat_source('HEAT', '1', '2', T=T2)
         turb('TURB','2','3',P7,KPDturb)
         T12 = input[1]
         Node('12',G=G1,P=P1,T=T12,fluid='CO2')
-        heat_exch_2streams('HTHE','3','4','12','1',T22=T1)
+        heat_exch('HTHE', '3', '4', '12', '1', T22=T1)
         T5 = input[2]
         Node('5',G=G1,P=P7,T=T5,fluid='CO2')
         T8 = input[3]
         Node('8',G=G1*x,P=P1,T=T8,fluid='CO2')
-        heat_exch_2streams('LTHE','4','5','8','9',T12=T5)
+        heat_exch('LTHE', '4', '5', '8', '9', T12=T5)
         split('SPLIT','5','6','10',x)
-        heat_exch('COOL','6','7',T=T7)
+        heat_source('COOL', '6', '7', T=T7)
         comp('MCOMP','7','8',P1,KPDcomp)
         comp('ACOMP','10','11',P1,KPDcomp)
         mix('MIX','9','11','12')
@@ -69,7 +68,6 @@ def Sensitivity(inp):
     return -KPD1
 
 Sensitivity([23.5e6,0.67])
-print(blocks)
 # minimize(Sensitivity,x0=[22e6,0.6], method='Nelder-Mead',tol=10**-2)
 
 # print(nodes)
