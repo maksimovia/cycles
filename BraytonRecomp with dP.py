@@ -5,6 +5,10 @@ from data import nodes, blocks
 from modules import Node, comp, turb,heat_source,heat_exch,split,mix
 from scipy.optimize import root_scalar,root,minimize
 
+
+global data
+data = open("res.txt", "a")
+
 def Sensitivity(inp):
     P1 = inp[0]
     x = inp[1]
@@ -49,11 +53,27 @@ def Sensitivity(inp):
     KPD1 = (N_TURB - N_MCOMP - N_RCOMP)/Q_HEAT*100
     # print(Q_HEAT + N_MCOMP + N_RCOMP - N_TURB - Q_COND)
     print(P1/1e6,x,P7,KPD1)
+    data.write( '\n'+ str(P1/1e6)
+               +'\t'+ str(x)
+               +'\t'+ str(P7)
+               +'\t'+ str(KPD1)
+               +'\t'+ str(Q_HEAT + N_MCOMP + N_RCOMP - N_TURB - Q_COND))
     # print(nodes)
 
     return -KPD1
 
-for P1 in np.linspace(20,35,16):
-    for x in np.linspace(0.6,0.8,21):
-        for P7 in np.linspace(7.6,8.2,11):
-            Sensitivity([P1,x,P7])
+from multiprocessing import Process, active_children
+from time import sleep
+
+if __name__ == '__main__':
+    for P1 in np.linspace(20e6,35e6,16):
+        for x in np.linspace(0.6,0.8,21):
+            for P7 in np.linspace(7.6e6,8.2e6,11):
+                calculating = Process(target=Sensitivity, args=([P1,x,P7]))
+                calculating.start()
+                while len(active_children()) > 59:
+                    sleep(2)
+            data.close()
+
+
+
