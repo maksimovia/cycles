@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.optimize
 from CoolProp.CoolProp import PropsSI as prop
 from data import nodes, blocks
 from modules import Node, comp, turb,heat_source,heat_exch,split,mix
@@ -7,14 +8,12 @@ from scipy.optimize import root_scalar,root,minimize
 def Sensitivity(inp):
     P1 = inp[0]
     x = inp[1]
-    dP = 100e3
-    #x = 0.68
+    P7 = inp[2]
+    dP = 50e3
     G1 = 1
-    P7 = 8e6
-    T7 = 35+273.15
-    #P1 = 22e6
-    T2 = 600+273.15
-    KPDcomp = 0.8
+    T7 = 32+273.15
+    T2 = 505+273.15
+    KPDcomp = 0.9
     KPDturb = 0.9
     dTh = 10
     dTl = 10
@@ -41,17 +40,20 @@ def Sensitivity(inp):
         Equation3 = blocks.loc['HTHE', 'dT'] - dTh
         Equation4 = blocks.loc['LTHE','dT'] - dTl
         return Equation3,Equation2,Equation1,Equation4
-    root(Calc,x0=[800, 500, 400, 350],method='hybr')
+    root(Calc,x0=[800, 500, 400, 350])
     N_TURB = blocks.loc['TURB']['N']
     N_MCOMP = blocks.loc['MCOMP']['N']
     N_RCOMP = blocks.loc['ACOMP']['N']
     Q_COND = blocks.loc['COOL','Q']
     Q_HEAT = blocks.loc['HEAT','Q']
     KPD1 = (N_TURB - N_MCOMP - N_RCOMP)/Q_HEAT*100
-    print(Q_HEAT + N_MCOMP + N_RCOMP - N_TURB - Q_COND)
-    print(P1/1e6,x,KPD1)
-    print(nodes)
+    # print(Q_HEAT + N_MCOMP + N_RCOMP - N_TURB - Q_COND)
+    print(P1/1e6,x,P7,KPD1)
+    # print(nodes)
 
     return -KPD1
 
-Sensitivity([23.5e6,0.67])
+for P1 in np.linspace(20,35,16):
+    for x in np.linspace(0.6,0.8,21):
+        for P7 in np.linspace(7.6,8.2,11):
+            Sensitivity([P1,x,P7])
